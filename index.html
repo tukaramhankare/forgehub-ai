@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+  <title>ForgeHub AI — Intelligent Project Organizer</title>
+  <link rel="stylesheet" href="style.css"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Fira+Code:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+</head>
+<body>
+
+<!-- ══════════════ SPLASH ══════════════ -->
+<div id="splash" class="splash">
+  <canvas id="bgCanvas" class="bg-canvas"></canvas>
+  <div class="splash-inner">
+    <div class="splash-logo">
+      <div class="logo-mark">
+        <div class="lm-a"></div><div class="lm-b"></div>
+        <div class="lm-c"></div><div class="lm-d"></div>
+      </div>
+      <span class="logo-wordmark">ForgeHub<em>AI</em></span>
+    </div>
+    <h1 class="splash-h1">
+      Messy files →<br/><span class="hl">Perfect GitHub repo</span><br/>in 60 seconds.
+    </h1>
+    <p class="splash-p">
+      Drop your project files. The engine detects your stack, restructures folders,
+      renames files intelligently, generates README / .gitignore / LICENSE,
+      then exports a ZIP ready to push — <strong>zero API needed</strong>.
+    </p>
+    <div class="splash-chips">
+      <span>⚡ Fully offline</span>
+      <span>🔒 Browser-only</span>
+      <span>📦 ZIP export</span>
+      <span>✏️ Monaco editor</span>
+      <span>🤖 Smart engine</span>
+    </div>
+    <div class="splash-btns">
+      <button id="btnEnter" class="s-btn-primary">Start Forging →</button>
+      <button id="btnDemo"  class="s-btn-ghost">Try Demo Project</button>
+    </div>
+    <p class="splash-credit">Built by <strong>Tukaram Hankare</strong> — Farmer, Coder &amp; Web Developer</p>
+  </div>
+</div>
+
+<!-- ══════════════ CONTEXT MENU ══════════════ -->
+<ul id="ctxMenu" class="ctx-menu hidden">
+  <li data-action="open">📂 Open</li>
+  <li data-action="rename">✏️ Rename</li>
+  <li data-action="duplicate">📋 Duplicate</li>
+  <li class="ctx-sep"></li>
+  <li data-action="newfile">📄 New File Here</li>
+  <li data-action="newfolder">📁 New Folder Here</li>
+  <li class="ctx-sep"></li>
+  <li data-action="enhance" class="ctx-ai">✨ AI Enhance</li>
+  <li data-action="refactor" class="ctx-ai">🔄 AI Refactor</li>
+  <li class="ctx-sep"></li>
+  <li data-action="delete" class="ctx-danger">🗑️ Delete</li>
+</ul>
+
+<!-- ══════════════ MODALS ══════════════ -->
+<div id="renameModal" class="modal-bg hidden">
+  <div class="modal">
+    <div class="modal-hd">
+      <span>Rename</span>
+      <button class="modal-x" data-close="renameModal">✕</button>
+    </div>
+    <input id="renameInput" class="modal-inp" type="text" autocomplete="off"/>
+    <div class="modal-ft">
+      <button class="m-btn-ghost" data-close="renameModal">Cancel</button>
+      <button class="m-btn-primary" id="renameOk">Rename</button>
+    </div>
+  </div>
+</div>
+
+<div id="genModal" class="modal-bg hidden">
+  <div class="modal">
+    <div class="modal-hd">
+      <span>Generate File</span>
+      <button class="modal-x" data-close="genModal">✕</button>
+    </div>
+    <p class="modal-desc">Describe the file you need. The engine creates it based on your project type.</p>
+    <input id="genInput" class="modal-inp" type="text" placeholder="e.g. login form, API config, navbar component…"/>
+    <div class="modal-ft">
+      <button class="m-btn-ghost" data-close="genModal">Cancel</button>
+      <button class="m-btn-primary" id="genOk">Generate</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ PROGRESS ══════════════ -->
+<div id="progressOverlay" class="prog-overlay hidden">
+  <div class="prog-box">
+    <div class="prog-spinner"><div></div><div></div><div></div></div>
+    <p class="prog-title" id="progTitle">Processing…</p>
+    <p class="prog-sub" id="progSub">Please wait</p>
+    <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+  </div>
+</div>
+
+<!-- ══════════════ TOASTS ══════════════ -->
+<div id="toastWrap" class="toast-wrap"></div>
+
+<!-- ══════════════ DRAWER OVERLAY ══════════════ -->
+<div id="drawerOverlay" class="drawer-overlay hidden"></div>
+
+<!-- ══════════════ APP ══════════════ -->
+<div id="app" class="app hidden">
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <!-- Left: logo + hamburger (mobile) + project name -->
+    <div class="tb-l">
+      <button class="tb-ham" id="btnHamSidebar" title="Explorer" aria-label="Toggle Explorer">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="tb-logo">
+        <div class="logo-mark sm">
+          <div class="lm-a"></div><div class="lm-b"></div>
+          <div class="lm-c"></div><div class="lm-d"></div>
+        </div>
+        <span class="tb-brand">ForgeHub<em>AI</em></span>
+      </div>
+      <div class="tb-div"></div>
+      <span class="tb-proj" id="tbProj" contenteditable="true" spellcheck="false" title="Click to rename">untitled-project</span>
+    </div>
+
+    <!-- Center: action buttons -->
+    <div class="tb-c">
+      <button class="tb-btn forge-btn" id="btnGitHub">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        <span class="tb-btn-text">Make GitHub Ready</span>
+      </button>
+      <button class="tb-btn" id="btnExport">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span class="tb-btn-text">Export ZIP</span>
+      </button>
+    </div>
+
+    <!-- Right: stats + panel toggle -->
+    <div class="tb-r">
+      <div class="tb-pill" id="tbStats">0 files</div>
+      <div class="tb-pill tb-pill-type" id="tbType">—</div>
+      <button class="tb-ham tb-ham-right" id="btnHamPanel" title="AI Panel" aria-label="Toggle AI Panel">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- WORKSPACE -->
+  <div class="workspace" id="workspace">
+
+    <!-- LEFT SIDEBAR (drawer on mobile) -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-inner">
+
+        <!-- Upload zone -->
+        <div class="drop-zone" id="dropZone">
+          <input type="file" id="fpFolder" multiple webkitdirectory style="display:none"/>
+          <input type="file" id="fpFiles" multiple style="display:none"/>
+          <div class="dz-icon">↑</div>
+          <p class="dz-text">Drop files or folder here</p>
+          <div class="dz-row">
+            <button class="dz-btn" id="pickFolder">📁 Folder</button>
+            <button class="dz-btn" id="pickFiles">📄 Files</button>
+          </div>
+        </div>
+
+        <!-- Tree header -->
+        <div class="tree-bar">
+          <span class="tree-bar-title">EXPLORER</span>
+          <div class="tree-bar-btns">
+            <button class="tbb" id="tbNewFile" title="New File">+F</button>
+            <button class="tbb" id="tbNewFolder" title="New Folder">+D</button>
+            <button class="tbb" id="tbCollapse" title="Collapse All">⊟</button>
+          </div>
+        </div>
+
+        <!-- File tree -->
+        <div class="file-tree" id="fileTree"></div>
+
+        <!-- AI Tools -->
+        <div class="ai-tools-panel">
+          <div class="atp-title">AI TOOLS</div>
+          <button class="atp-btn" data-tool="autoStructure"><span>⚙️</span>Auto-Structure Project</button>
+          <button class="atp-btn" data-tool="readme"><span>📝</span>Generate README</button>
+          <button class="atp-btn" data-tool="gitignore"><span>🛡️</span>.gitignore + LICENSE</button>
+          <button class="atp-btn" data-tool="gaps"><span>🔍</span>Fill Project Gaps</button>
+          <button class="atp-btn" data-tool="genfile"><span>✨</span>Generate New File</button>
+          <button class="atp-btn" data-tool="contributing"><span>🤝</span>CONTRIBUTING.md</button>
+        </div>
+
+      </div>
+    </aside>
+
+    <!-- EDITOR CENTER -->
+    <main class="editor-main" id="editorMain">
+      <div class="tab-strip" id="tabStrip"></div>
+      <div class="editor-body" id="editorBody">
+        <div class="editor-welcome" id="editorWelcome">
+          <div class="ew-logo">
+            <div class="logo-mark xl">
+              <div class="lm-a"></div><div class="lm-b"></div>
+              <div class="lm-c"></div><div class="lm-d"></div>
+            </div>
+          </div>
+          <p class="ew-h">Open a file to edit</p>
+          <p class="ew-s">Select from the explorer, or upload files to begin</p>
+          <div class="ew-keys">
+            <div class="ew-key"><kbd>Ctrl+S</kbd> Save</div>
+            <div class="ew-key"><kbd>Ctrl+W</kbd> Close tab</div>
+            <div class="ew-key"><kbd>Right-click</kbd> Options</div>
+          </div>
+        </div>
+        <div id="monacoMount" class="monaco-mount"></div>
+      </div>
+    </main>
+
+    <!-- RIGHT PANEL (drawer on mobile) -->
+    <aside class="r-panel" id="rPanel">
+      <div class="rp-tabbar">
+        <button class="rp-tab active" data-rp="chat">💬 Chat</button>
+        <button class="rp-tab" data-rp="insights">📊 Insights</button>
+        <button class="rp-tab" data-rp="changes">🔀 Changes</button>
+      </div>
+
+      <div class="rp-pane active" id="rpChat">
+        <div class="msgs" id="msgs">
+          <div class="msg bot">
+            <div class="msg-av">FH</div>
+            <div class="msg-bub">
+              👋 <strong>ForgeHub AI</strong> — ready!<br/><br/>
+              Drop your project files and I'll structure, rename, document, and prepare them for GitHub — all locally, no API key needed.<br/><br/>
+              <em>Try uploading a messy project folder to see the magic.</em>
+            </div>
+          </div>
+        </div>
+        <div class="chat-row">
+          <textarea id="chatInput" class="chat-ta" placeholder="Ask about your project… (Enter to send)" rows="2"></textarea>
+          <button class="chat-go" id="chatGo" aria-label="Send">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="rp-pane" id="rpInsights">
+        <div class="insights-inner" id="insightsInner">
+          <p class="rp-empty">Upload files to see project insights.</p>
+        </div>
+      </div>
+
+      <div class="rp-pane" id="rpChanges">
+        <div class="changes-inner" id="changesInner">
+          <p class="rp-empty">Apply AI tools to track changes here.</p>
+        </div>
+      </div>
+    </aside>
+
+  </div><!-- /workspace -->
+
+  <!-- STATUS BAR -->
+  <footer class="statusbar">
+    <span class="sb-l" id="sbL">Ready</span>
+    <span class="sb-r" id="sbR">ForgeHub AI · Tukaram Hankare</span>
+  </footer>
+
+</div><!-- /app -->
+
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
